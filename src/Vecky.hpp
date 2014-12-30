@@ -11,7 +11,7 @@
 
 namespace Vecky {
 
-#define OPERATION_STRUCT(OP_NAME, OPERATION, RET_T)				\
+#define OPERATION_STRUCT(OP_NAME, OPERATION, RET_T)		 \
 template <typename E1, typename E2, typename T, unsigned int N>  \
  struct OP_NAME {							\
   template<unsigned int I>						\
@@ -64,16 +64,25 @@ struct ExprNode {
   }
 };
 
-template<typename E1, template <typename, typename, typename, unsigned int> class OP, typename E2, typename T, unsigned int N, unsigned int i>
+template<typename E1,
+	 template <typename, typename, typename, unsigned int> class OP,
+	 typename E2,
+	 typename T,
+	 unsigned int I,
+	 unsigned int N>
 struct COPY {
   __host__ __device__ inline static void
   apply(T* _data, ExprNode<E1, OP, E2, T, N> const& expr){
-    _data[i] = expr.template get<i>();
-    COPY<E1, OP, E2, T, N, i + 1>::apply(_data, expr);
+    _data[I] = expr.template get<I>();
+    COPY<E1, OP, E2, T, I + 1, N>::apply(_data, expr);
   }
 };
 
-template<typename E1, template <typename, typename, typename, unsigned int> class OP, typename E2, typename T, unsigned int N>
+template<typename E1,
+	 template <typename, typename, typename, unsigned int> class OP,
+	 typename E2,
+	 typename T,
+	 unsigned int N>
 struct COPY<E1, OP, E2, T, N, N> {
   __host__ __device__ inline static void
   apply(T* _data, ExprNode<E1, OP, E2, T, N> const& expr){}
@@ -89,7 +98,7 @@ public:
   template<typename E1, template <typename, typename, typename, unsigned int> class OP, typename E2>
   __host__ __device__ inline
   VecN(ExprNode<E1, OP, E2, T, N> const& expr){
-    COPY<E1, OP, E2, T, N, 0>::apply(&_data[0], expr);
+    COPY<E1, OP, E2, T, 0, N>::apply(&_data[0], expr);
   }
 
   __host__ __device__ inline
@@ -144,6 +153,11 @@ public:
   }
 };
 
+/////////////////////////////////////////////////////////////////////////////////////
+/*
+  This is for vector/vector operations that produce vectors.
+ */
+/////////////////////////////////////////////////////////////////////////////////////
 
 #define BINARY_VECTOR_OPERATION(OP_NAME, SYMBOL, RET_T, F_NAME)		\
 template<typename E1,							\
@@ -209,6 +223,11 @@ struct CROSS {
 BINARY_VECTOR_OPERATION(CROSS, , T, cross)
 
 
+/////////////////////////////////////////////////////////////////////////////////////
+/*
+  This is for vector/scalar operations that produce vectors.
+ */
+/////////////////////////////////////////////////////////////////////////////////////
 
 #define SCALAR_VECTOR_OPERATION(OP_NAME, SYMBOL, RET_T, F_NAME)		\
 template<typename E1,							\
@@ -346,8 +365,26 @@ struct MAG {
   }
 };
 
+template<typename E1, typename T, unsigned int I, unsigned int N>
+struct SUM {
+  __host__ __device__ inline static T
+  apply(E1 const& e1) {
+    return e1.template get<I>() + SUM<E1, T, I + 1, N>::apply(e1);
+  }
+};
+
+template<typename E1, typename T, unsigned int N>
+struct SUM<E1, T, N, N> {
+  __host__ __device__ inline static T
+  apply(E1 const& e1) {
+    return 0.0;
+  }
+};
+
+
 
 UNARY_VECTOR_TO_SCALAR(MAG, , T, mag)
+UNARY_VECTOR_TO_SCALAR(SUM, , T, sum)
 
 }
 #endif
