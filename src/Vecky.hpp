@@ -85,7 +85,10 @@ template<typename E1,
 	 unsigned int N>
 struct COPY<E1, OP, E2, T, N, N> {
   __host__ __device__ inline static void
-  apply(T* _data, ExprNode<E1, OP, E2, T, N> const& expr){}
+  apply(T* _data, ExprNode<E1, OP, E2, T, N> const& expr){
+    (void)_data;
+    (void)expr;
+  }
 };
 
 
@@ -332,6 +335,8 @@ template<typename E1, typename E2, typename T, unsigned int N>
 struct DOT<E1, E2, T, N, N> {
   __host__ __device__ inline static T
   apply(E1 const& e1, E2 const& e2) {
+    (void)e1;
+    (void)e2;
     return 0.0;
   }
 };
@@ -377,6 +382,7 @@ template<typename E1, typename T, unsigned int N>
 struct SUM<E1, T, N, N> {
   __host__ __device__ inline static T
   apply(E1 const& e1) {
+    (void)e1;
     return 0.0;
   }
 };
