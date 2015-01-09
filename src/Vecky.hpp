@@ -50,6 +50,11 @@ OPERATION_STRUCT(OprGEq, >=, bool)
 OPERATION_STRUCT(OprLEq, <=, bool)
 
 
+//A dummy struct 
+struct EmptyExpr {};
+
+
+//This is for binary expressions
 template <typename E1, template <typename, typename, typename, unsigned int> class OP, typename E2, typename T, unsigned int N>
 struct ExprNode {
   E1 const& _e1;
@@ -61,6 +66,22 @@ struct ExprNode {
   template<unsigned int I>
   __host__ __device__ inline T get() const {
     return OP<E1, E2, T, N>::template apply<I>(_e1, _e2);
+  }
+};
+
+//This is for singleton expressions like negation or logical operations
+
+  
+template <typename E1, template <typename, typename, typename, unsigned int> class OP, typename T, unsigned int N>
+struct ExprNode<E1, OP, EmptyExpr, T, N> {
+  E1 const& _e1;
+  __host__ __device__ inline ExprNode(E1 const& e1)
+    : _e1(e1)
+  {}
+  
+  template<unsigned int I>
+  __host__ __device__ inline T get() const {
+    return OP<E1, EmptyExpr, T, N>::template apply<I>(_e1);
   }
 };
 
@@ -158,6 +179,79 @@ public:
 
 /////////////////////////////////////////////////////////////////////////////////////
 /*
+  This is for Unary vector operations that take a vector and apply a function to every element
+ */
+/////////////////////////////////////////////////////////////////////////////////////
+#define UNARY_OPERATION_STRUCT(OP_NAME, OPERATION, RET_T)		\
+template <typename E1, typename E2, typename T, unsigned int N>	        \
+ struct OP_NAME {							\
+  template<unsigned int I>						\
+  __host__ __device__ inline static RET_T				\
+  apply(E1 const& v1){							\
+    return OPERATION v1.template get<I>();				\
+  }									\
+};									
+
+
+#define UNARY_FUNCTION_STRUCT(OP_NAME, FUNCTION, RET_T)		\
+  template <typename E1, typename E2, typename T, unsigned int N>			\
+ struct OP_NAME {							\
+  template<unsigned int I>						\
+  __host__ __device__ inline static RET_T				\
+  apply(E1 const& v1){					\
+    return (RET_T)FUNCTION(v1.template get<I>());				\
+  }									\
+};									
+
+
+#define UNARY_VECTOR_OPERATION(OP_NAME, SYMBOL, RET_T, F_NAME)		\
+template<typename E1,							\
+         typename E2,							\
+	 template <typename, typename, typename, unsigned int> class PrevOp1, \
+	 typename T,    \
+	 unsigned int N>						\
+__host__ __device__ inline ExprNode<ExprNode<E1, PrevOp1, E2, T, N>, OP_NAME, EmptyExpr, RET_T, N> const \
+F_NAME SYMBOL (ExprNode<E1, PrevOp1, E2, T, N> const& expNode1){ \
+  return ExprNode<ExprNode<E1, PrevOp1, E2, T, N>, OP_NAME, EmptyExpr, RET_T, N>(expNode1); \
+}   \
+template<typename T, unsigned int N>  \
+__host__ __device__ inline ExprNode<VecN<T, N> , OP_NAME, EmptyExpr, RET_T, N> const  \
+F_NAME SYMBOL (VecN<T, N> const& vec1){   \
+  return ExprNode<VecN<T, N>, OP_NAME, EmptyExpr, RET_T, N>(vec1);  \
+}
+
+
+UNARY_OPERATION_STRUCT(UNegate, -, T)
+UNARY_OPERATION_STRUCT(UBitNot, ~, T)
+UNARY_OPERATION_STRUCT(ULogNot, !, bool)
+UNARY_VECTOR_OPERATION(UNegate, -, T, operator)
+UNARY_VECTOR_OPERATION(UBitNot, ~, T, operator)
+UNARY_VECTOR_OPERATION(ULogNot, !, bool, operator)
+
+#define UNARY_VECTOR_FUNCTION(F_NAME, RET_T)		\
+  UNARY_FUNCTION_STRUCT(U##F_NAME, F_NAME, RET_T) \
+  UNARY_VECTOR_OPERATION(U##F_NAME, F_NAME, RET_T, )
+
+UNARY_VECTOR_FUNCTION(cos, T)
+UNARY_VECTOR_FUNCTION(sin, T)
+UNARY_VECTOR_FUNCTION(tan, T)
+UNARY_VECTOR_FUNCTION(acos, T)
+UNARY_VECTOR_FUNCTION(asin, T)
+UNARY_VECTOR_FUNCTION(atan, T)
+UNARY_VECTOR_FUNCTION(cosh, T)
+UNARY_VECTOR_FUNCTION(sinh, T)
+UNARY_VECTOR_FUNCTION(tanh, T)
+UNARY_VECTOR_FUNCTION(log, T)
+UNARY_VECTOR_FUNCTION(log10, T)
+UNARY_VECTOR_FUNCTION(sqrt, T)
+UNARY_VECTOR_FUNCTION(ceil, T)
+UNARY_VECTOR_FUNCTION(floor, T)
+UNARY_VECTOR_FUNCTION(fmod, T)
+UNARY_VECTOR_FUNCTION(abs, T)
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+/*
   This is for vector/vector operations that produce vectors.
  */
 /////////////////////////////////////////////////////////////////////////////////////
@@ -201,6 +295,7 @@ __host__ __device__ inline ExprNode<VecN<T, N> , OP_NAME, VecN<T, N>, RET_T, N> 
 F_NAME SYMBOL (VecN<T, N> const& vec1, VecN<T, N> const& vec2){   \
   return ExprNode<VecN<T, N>, OP_NAME, VecN<T, N>, RET_T, N>(vec1, vec2);  \
 }
+
 
 BINARY_VECTOR_OPERATION(OprAdd, +, T, operator)
 BINARY_VECTOR_OPERATION(OprMult, *, T, operator)
